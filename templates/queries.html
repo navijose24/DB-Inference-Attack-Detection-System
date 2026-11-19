@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Query History — DB Sentinel{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1 tracking-tight text-white">Database Query History</h2>
+            <p class="text-secondary mb-0">Complete historical audit trail of all inspected queries with risk classifications.</p>
+        </div>
+        <button class="btn btn-outline-cyan btn-sm" onclick="QueryHistoryPage.load()">
+            <i class="fas fa-arrows-rotate me-1"></i> Refresh Logs
+        </button>
+    </div>
+
+    <div class="card p-3">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead class="text-secondary small">
+                    <tr>
+                        <th style="width: 70px;">ID</th>
+                        <th>QUERY TEXT</th>
+                        <th style="width: 130px;">CLASSIFICATION</th>
+                        <th style="width: 140px;">RISK SCORE</th>
+                        <th style="width: 120px;">ACTION</th>
+                        <th style="width: 180px;">EXECUTED AT</th>
+                    </tr>
+                </thead>
+                <tbody id="queriesTableBody">
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary py-4">Loading query history...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        QueryHistoryPage.load();
+    });
+</script>
+{% endblock %}

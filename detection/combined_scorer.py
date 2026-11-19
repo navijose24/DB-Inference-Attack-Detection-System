@@ -4,10 +4,14 @@ class CombinedScorer:
         self.ml_weight = ml_weight
 
     def compute_combined_score(self, rule_score, ml_score):
-        """Weighted combination, clamped to [0,1]."""
+        """Weighted combination, clamped to [0, 1]."""
         combined = self.rule_weight * rule_score + self.ml_weight * ml_score
-        # Boost if both are high (agreement bonus)
-        if rule_score > 0.6 and ml_score > 0.6:
+        # Decisive threat priority: if rule or ML is very high, avoid over-dilution
+        if rule_score >= 0.8:
+            combined = max(combined, rule_score * 0.95)
+        elif ml_score >= 0.85:
+            combined = max(combined, ml_score * 0.90)
+        elif rule_score > 0.5 and ml_score > 0.5:
             combined = min(1.0, combined * 1.15)
         return min(1.0, max(0.0, combined))
 

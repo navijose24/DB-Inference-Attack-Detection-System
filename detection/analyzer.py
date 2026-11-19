@@ -321,7 +321,8 @@ class QueryAnalyzer:
             if now - ts > _HISTORY_WINDOW:
                 break
             sim = self._structural_similarity(parsed_info, prev_parsed)
-            if sim < self.similarity_threshold:
+            # Differencing queries typically have ~0.70 - 0.85 similarity due to altered WHERE clauses
+            if sim < 0.70:
                 continue
 
             # Same aggregates?
@@ -370,47 +371,45 @@ class QueryAnalyzer:
 
     def _detect_small_set_attack(self, parsed_info):
         """
-        Aggregate on sensitive column with WHERE that returns very few rows.
+        Aggregate or direct selection on sensitive column with WHERE that returns very few rows.
         """
         result = {'score': 0.0, 'description': ''}
 
-        if not parsed_info.get('has_aggregate'):
-            return result
-
+        has_agg = parsed_info.get('has_aggregate', False)
+        sensitive_cols = parsed_info.get('sensitive_columns', [])
         estimate = parsed_info.get('result_set_estimate')
-
         conditions = parsed_info.get('where_conditions', [])
         eq_count = sum(1 for c in conditions if c.get('operator') == '=')
 
         # Unique-ish column equality
-        unique_cols = {'name', 'emp_id', 'employee_id', 'id', 'ssn', 'email'}
+        unique_cols = {'name', 'emp_id', 'employee_id', 'id', 'ssn', 'ssn_last4', 'email'}
         unique_hit = any(c['column'] in unique_cols for c in conditions if c.get('operator') == '=')
 
         score = 0.0
 
-        if unique_hit and parsed_info.get('has_aggregate'):
-            score = 0.9
+        if unique_hit:
+            score = 0.90 if (has_agg or sensitive_cols) else 0.70
         elif estimate is not None and estimate <= self.small_set_threshold:
-            score = 0.75
+            score = 0.80 if (has_agg or sensitive_cols) else 0.60
         elif eq_count >= 3:
-            score = 0.65
-        elif eq_count >= 2 and parsed_info.get('sensitive_columns'):
-            score = 0.5
-        elif eq_count >= 1 and parsed_info.get('sensitive_columns') and parsed_info.get('has_aggregate'):
-            score = 0.35
+            score = 0.70 if (has_agg or sensitive_cols) else 0.50
+        elif eq_count >= 2 and sensitive_cols:
+            score = 0.55
+        elif eq_count >= 1 and sensitive_cols and has_agg:
+            score = 0.40
 
         # Boost if sensitive columns are targeted
-        if parsed_info.get('sensitive_columns') and score > 0:
+        if sensitive_cols and score > 0:
             score = min(1.0, score + 0.1)
 
         result['score'] = score
         if score >= 0.5:
             result['description'] = (
-                f'Aggregate query with highly restrictive WHERE (est. {estimate} rows) '
-                f'targets sensitive column(s): {parsed_info.get("sensitive_columns")}.'
+                f'Query with highly restrictive WHERE (est. {estimate or 1} rows) '
+                f'targets sensitive column(s): {sensitive_cols or "records"}.'
             )
         elif score > 0:
-            result['description'] = 'Moderately narrow query with aggregate function.'
+            result['description'] = 'Moderately narrow query filtering specific records.'
 
         return result
 
@@ -527,11 +526,17 @@ class QueryAnalyzer:
 
     @staticmethod
     def _compute_risk_score(attack_results):
-        """Weighted combination of individual attack scores, clamped [0,1]."""
-        total = sum(
+        """
+        Risk is driven by the most severe attack signature, with compound
+        weighting for multi-vector attacks.
+        """
+        scores = [attack_results[k].get('score', 0) for k in _ATTACK_WEIGHTS]
+        max_score = max(scores) if scores else 0.0
+        weighted_sum = sum(
             _ATTACK_WEIGHTS[k] * attack_results[k].get('score', 0)
             for k in _ATTACK_WEIGHTS
         )
+        total = max(max_score, weighted_sum * 1.5)
         return min(1.0, max(0.0, total))
 
     # ------------------------------------------------------------------

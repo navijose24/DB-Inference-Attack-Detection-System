@@ -58,23 +58,22 @@ def analyze_query():
     try:
         from detection.analyzer import QueryAnalyzer
         from detection.ml_detector import MLDetector
+        from detection.combined_scorer import CombinedScorer
 
         analyzer = QueryAnalyzer()
-        analysis = analyzer.analyze(query_text)
+        analysis = analyzer.analyze(query_text, user_id=g.user.get('user_id'))
 
         ml = MLDetector()
-        ml_score = ml.score(query_text)
+        ml_score = ml.score(query_text, analysis.get('parsed'))
 
-        # Combine rule-based and ML scores (weighted average)
         rule_score = analysis.get('risk_score', 0)
-        combined_score = 0.6 * rule_score + 0.4 * ml_score
-        combined_score = min(combined_score, 1.0)
-
-        classification = 'safe'
-        if combined_score >= current_app.config['RISK_THRESHOLD_BLOCK']:
-            classification = 'blocked'
-        elif combined_score >= current_app.config['RISK_THRESHOLD_FLAG']:
-            classification = 'flagged'
+        scorer = CombinedScorer()
+        combined_score = scorer.compute_combined_score(rule_score, ml_score)
+        classification = scorer.classify(
+            combined_score,
+            block_threshold=current_app.config['RISK_THRESHOLD_BLOCK'],
+            flag_threshold=current_app.config['RISK_THRESHOLD_FLAG']
+        ).lower()
 
         is_blocked = classification == 'blocked'
         attack_types = analysis.get('attack_types', [])
@@ -179,22 +178,22 @@ def execute_sim_query():
     try:
         from detection.analyzer import QueryAnalyzer
         from detection.ml_detector import MLDetector
+        from detection.combined_scorer import CombinedScorer
 
         analyzer = QueryAnalyzer()
-        analysis = analyzer.analyze(query_text)
+        analysis = analyzer.analyze(query_text, user_id=g.user.get('user_id'))
 
         ml = MLDetector()
-        ml_score = ml.score(query_text)
+        ml_score = ml.score(query_text, analysis.get('parsed'))
 
         rule_score = analysis.get('risk_score', 0)
-        combined_score = 0.6 * rule_score + 0.4 * ml_score
-        combined_score = min(combined_score, 1.0)
-
-        classification = 'safe'
-        if combined_score >= current_app.config['RISK_THRESHOLD_BLOCK']:
-            classification = 'blocked'
-        elif combined_score >= current_app.config['RISK_THRESHOLD_FLAG']:
-            classification = 'flagged'
+        scorer = CombinedScorer()
+        combined_score = scorer.compute_combined_score(rule_score, ml_score)
+        classification = scorer.classify(
+            combined_score,
+            block_threshold=current_app.config['RISK_THRESHOLD_BLOCK'],
+            flag_threshold=current_app.config['RISK_THRESHOLD_FLAG']
+        ).lower()
 
         is_blocked = classification == 'blocked'
         attack_types = analysis.get('attack_types', [])

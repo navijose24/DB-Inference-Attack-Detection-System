@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Query Simulator — DB Sentinel{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1 tracking-tight text-white">Inference Attack Simulator</h2>
+            <p class="text-secondary mb-0">Simulate database queries, test inference attack heuristics, and evaluate real-time ML risk scoring.</p>
+        </div>
+    </div>
+
+    <!-- Presets Toolbar -->
+    <div class="card p-3 mb-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <span class="small text-secondary fw-semibold text-uppercase">
+                <i class="fas fa-flask me-1 text-cyan"></i> Demonstration Attack Scenarios:
+            </span>
+            <div class="btn-group flex-wrap">
+                <button type="button" class="btn btn-sm btn-outline-success" onclick="QuerySimulator.loadPreset('safe')">
+                    <i class="fas fa-shield me-1"></i> 1. Safe Aggregation
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="QuerySimulator.loadPreset('differencing')">
+                    <i class="fas fa-balance-scale me-1"></i> 2. Differencing Attack
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-warning" onclick="QuerySimulator.loadPreset('small_set')">
+                    <i class="fas fa-compress-arrows-alt me-1"></i> 3. Small-Set Attack
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-purple" onclick="QuerySimulator.loadPreset('attribute')">
+                    <i class="fas fa-user-secret me-1"></i> 4. Attribute Inference
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-info" onclick="QuerySimulator.loadPreset('repeated')">
+                    <i class="fas fa-history me-1"></i> 5. Repeated Query Probe
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Query Input Workspace -->
+    <div class="card p-4 mb-4">
+        <label for="queryInput" class="form-label d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold text-white"><i class="fas fa-terminal me-2 text-cyan"></i>SQL Query Input</span>
+            <span class="small text-secondary">Target: <code>employees</code> table (Confidential Records)</span>
+        </label>
+        <textarea id="queryInput" class="form-control query-input mb-3" rows="5" placeholder="SELECT * FROM employees WHERE ...">SELECT department, COUNT(*) AS head_count, ROUND(AVG(salary), 2) AS avg_dept_salary
+FROM employees
+GROUP BY department;</textarea>
+
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="text-secondary small">
+                <i class="fas fa-info-circle me-1 text-cyan"></i>
+                Inspects sensitive attributes (<code>salary</code>, <code>ssn_last4</code>, <code>designation</code>) and query structure.
+            </div>
+            <div class="d-flex gap-2">
+                <button id="btnAnalyze" class="btn btn-outline-cyan" onclick="QuerySimulator.analyze()">
+                    <i class="fas fa-microchip me-1"></i> Analyze Threat
+                </button>
+                <button id="btnExecute" class="btn btn-cyber" onclick="QuerySimulator.execute()">
+                    <i class="fas fa-bolt me-1"></i> Execute Query
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Telemetry Panel (Hidden until analyzed/executed) -->
+    <div id="analysisResultPanel" style="display: none;" class="mb-4">
+        <!-- Main Assessment Card -->
+        <div class="card p-4 mb-4">
+            <div class="row g-4 align-items-center">
+                <!-- Gauge / Score -->
+                <div class="col-12 col-md-4 text-center border-end border-secondary border-opacity-25">
+                    <span class="small text-secondary text-uppercase fw-semibold d-block mb-1">Threat Risk Score</span>
+                    <h1 id="riskScoreValue" class="display-3 fw-bold mb-2 text-white">0%</h1>
+                    <div class="progress mb-3 mx-auto" style="height: 10px; max-width: 200px;">
+                        <div id="riskScoreBar" class="progress-bar bg-success" style="width: 0%"></div>
+                    </div>
+                    <div>
+                        <span id="classificationBadge" class="risk-badge risk-safe">SAFE</span>
+                    </div>
+                </div>
+
+                <!-- Engine Breakdown -->
+                <div class="col-12 col-md-8">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <div class="p-3 bg-darkest rounded border border-secondary border-opacity-25">
+                                <span class="small text-secondary d-block">ML Isolation Forest Anomaly</span>
+                                <h4 id="mlAnomalyScore" class="fw-bold text-cyan mt-1 mb-0">0%</h4>
+                                <small class="text-secondary">Unsupervised structural anomaly probability</small>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="p-3 bg-darkest rounded border border-secondary border-opacity-25">
+                                <span class="small text-secondary d-block">Rule-Based Attack Heuristics</span>
+                                <h4 id="ruleScore" class="fw-bold text-warning mt-1 mb-0">0%</h4>
+                                <small class="text-secondary">Weighted mathematical inference detector</small>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <span class="small text-secondary d-block mb-2">Detected Threat Signatures:</span>
+                            <div id="detectedAttacksList" class="d-flex flex-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attack Details Grid -->
+        <h5 class="fw-bold text-white mb-3"><i class="fas fa-layer-group me-2 text-cyan"></i>Inference Heuristics Analysis</h5>
+        <div id="attackDetailsContainer" class="row"></div>
+    </div>
+
+    <!-- Execution Results Table (Hidden until executed) -->
+    <div id="executionResultsCard" class="card p-4 mb-4" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="fw-bold mb-0 text-white"><i class="fas fa-table me-2 text-cyan"></i>Database Query Results</h5>
+                <small class="text-secondary">Execution returned from persistent MySQL storage</small>
+            </div>
+            <span id="resultsRowCount" class="badge bg-secondary">0 rows</span>
+        </div>
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-dark table-hover table-striped align-middle mb-0">
+                <thead id="resultsTableHead" class="text-cyan small sticky-top bg-darkest"></thead>
+                <tbody id="resultsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,3 +1,8 @@
+"""
+DB Sentinel — Database Connection & Query Execution Helper
+Uses mysql.connector with connection pooling for thread-safe high performance.
+"""
+
 import mysql.connector
 from mysql.connector import pooling
 
@@ -7,6 +12,9 @@ _pool = None
 def init_db(app):
     """Initialize the connection pool from Flask app config."""
     global _pool
+    # If already initialized and connected, return existing pool
+    if _pool is not None:
+        return
     _pool = pooling.MySQLConnectionPool(
         pool_name="db_sentinel_pool",
         pool_size=5,
@@ -21,6 +29,8 @@ def init_db(app):
 
 def get_db():
     """Return a connection from the pool."""
+    if _pool is None:
+        raise RuntimeError("Database pool not initialized. Call init_db(app) first.")
     return _pool.get_connection()
 
 

@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — DB Sentinel{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <!-- Header Title -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1 tracking-tight text-white">Security Operations Center</h2>
+            <p class="text-secondary mb-0">Real-time database inference attack telemetry &amp; behavioral threat intelligence.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-cyan btn-sm" onclick="Dashboard.loadStats()">
+                <i class="fas fa-arrows-rotate me-1"></i> Refresh
+            </button>
+            <a href="/simulator" class="btn btn-cyber btn-sm">
+                <i class="fas fa-play me-1"></i> Launch Simulator
+            </a>
+        </div>
+    </div>
+
+    <!-- Stat Cards Grid -->
+    <div class="row g-3 mb-4">
+        <!-- Total Queries -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card stat-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-secondary small text-uppercase fw-semibold">Total Inspected Queries</span>
+                        <h3 id="statTotalQueries" class="fw-bold mb-0 text-white mt-1">0</h3>
+                    </div>
+                    <div class="stat-icon-wrapper bg-cyan-subtle text-cyan">
+                        <i class="fas fa-magnifying-glass fa-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-secondary border-opacity-10 small text-secondary">
+                    <i class="fas fa-microchip me-1 text-cyan"></i> Analyzed via SQLGlot &amp; ML
+                </div>
+            </div>
+        </div>
+
+        <!-- Blocked Queries -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card stat-card p-3 h-100" style="border-left: 4px solid #ef4444;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-secondary small text-uppercase fw-semibold">Blocked Inferences</span>
+                        <h3 id="statBlockedQueries" class="fw-bold mb-0 text-danger mt-1">0</h3>
+                    </div>
+                    <div class="stat-icon-wrapper bg-danger-subtle text-danger">
+                        <i class="fas fa-ban fa-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-secondary border-opacity-10 small text-secondary">
+                    <span class="text-danger fw-semibold">Risk &ge; 0.80</span> terminated automatically
+                </div>
+            </div>
+        </div>
+
+        <!-- Flagged Queries -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card stat-card p-3 h-100" style="border-left: 4px solid #f59e0b;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-secondary small text-uppercase fw-semibold">Flagged Anomalies</span>
+                        <h3 id="statFlaggedQueries" class="fw-bold mb-0 text-warning mt-1">0</h3>
+                    </div>
+                    <div class="stat-icon-wrapper bg-warning-subtle text-warning">
+                        <i class="fas fa-flag fa-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-secondary border-opacity-10 small text-secondary">
+                    <span class="text-warning fw-semibold">0.50 &le; Risk &lt; 0.80</span> elevated watchlist
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Alerts -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card stat-card p-3 h-100" style="border-left: 4px solid #7c3aed;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-secondary small text-uppercase fw-semibold">Security Alerts</span>
+                        <h3 id="statActiveAlerts" class="fw-bold mb-0 text-purple mt-1">0</h3>
+                    </div>
+                    <div class="stat-icon-wrapper bg-purple-subtle text-purple">
+                        <i class="fas fa-bell fa-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-secondary border-opacity-10 small text-secondary">
+                    Requires Security Analyst triage
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row g-3 mb-4">
+        <!-- 24-Hour Query Volume -->
+        <div class="col-12 col-lg-8">
+            <div class="card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="fw-bold mb-0 text-white">Query Inspection Activity (24h)</h5>
+                        <small class="text-secondary">Monitored database transactions over hourly intervals</small>
+                    </div>
+                    <span class="badge bg-dark border border-secondary text-cyan">Live Stream</span>
+                </div>
+                <div class="chart-container" style="position: relative; height: 260px;">
+                    <canvas id="queryTimelineChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attack Type Breakdown -->
+        <div class="col-12 col-lg-4">
+            <div class="card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="fw-bold mb-0 text-white">Inference Attack Signatures</h5>
+                        <small class="text-secondary">Classified attack heuristics</small>
+                    </div>
+                </div>
+                <div class="chart-container" style="position: relative; height: 260px;">
+                    <canvas id="attackDistChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secondary Row: Risk Profile & Recent Alerts -->
+    <div class="row g-3">
+        <!-- Risk Distribution -->
+        <div class="col-12 col-lg-4">
+            <div class="card p-3 h-100">
+                <h5 class="fw-bold mb-1 text-white">Query Threat Distribution</h5>
+                <small class="text-secondary mb-3 d-block">Overall distribution by classification category</small>
+                <div class="chart-container" style="position: relative; height: 220px;">
+                    <canvas id="riskProfileChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Alerts Table -->
+        <div class="col-12 col-lg-8">
+            <div class="card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="fw-bold mb-0 text-white">Recent Security Alerts</h5>
+                        <small class="text-secondary">High-severity inference incidents</small>
+                    </div>
+                    <a href="/alerts" class="btn btn-sm btn-outline-secondary">View All</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0">
+                        <thead class="text-secondary small">
+                            <tr>
+                                <th>SEVERITY</th>
+                                <th>ATTACK TYPE</th>
+                                <th>DESCRIPTION</th>
+                                <th>TIME</th>
+                                <th>STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentAlertsTbody">
+                            <tr>
+                                <td colspan="5" class="text-center text-secondary py-3">Loading telemetry...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        Dashboard.init();
+    });
+</script>
+{% endblock %}
