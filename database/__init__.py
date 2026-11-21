@@ -29,8 +29,22 @@ def init_db(app):
 
 def get_db():
     """Return a connection from the pool."""
+    global _pool
     if _pool is None:
-        raise RuntimeError("Database pool not initialized. Call init_db(app) first.")
+        try:
+            from flask import current_app
+            if current_app:
+                init_db(current_app)
+        except Exception as e:
+            raise RuntimeError(
+                f"Database connection failed: {e}. "
+                "Ensure MySQL is running (e.g., 'net start MySQL80') and run 'python database/setup.py --reset'."
+            ) from e
+    if _pool is None:
+        raise RuntimeError(
+            "Database pool not initialized. "
+            "Ensure MySQL is running (e.g., 'net start MySQL80') and run 'python database/setup.py --reset'."
+        )
     return _pool.get_connection()
 
 

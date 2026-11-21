@@ -1,6 +1,7 @@
+import decimal
 import json
 import traceback
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, request, jsonify, g, current_app
 
@@ -11,11 +12,18 @@ from models import (
     get_audit_logs, verify_audit_chain, create_audit_log,
 )
 from database import execute_query
+from detection.analyzer import QueryAnalyzer
+from detection.ml_detector import MLDetector
+from detection.combined_scorer import CombinedScorer
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
+_analyzer = QueryAnalyzer()
+_ml_detector = MLDetector()
+_scorer = CombinedScorer()
 
-# ── JSON helper for datetime fields ──────────────────────────────────
+
+# ── JSON helper for datetime & decimal fields ────────────────────────
 
 def _serialize(obj):
     """Make query-result dicts JSON-safe."""
@@ -23,10 +31,16 @@ def _serialize(obj):
         return [_serialize(item) for item in obj]
     if isinstance(obj, dict):
         return {k: _serialize(v) for k, v in obj.items()}
+    if isinstance(obj, (set, tuple)):
+        return [_serialize(item) for item in obj]
     if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, date):
         return obj.isoformat()
     if isinstance(obj, timedelta):
         return str(obj)
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
     if isinstance(obj, bytes):
         return obj.decode(errors='replace')
     return obj
@@ -56,20 +70,11 @@ def analyze_query():
         return jsonify({'error': 'Query too long'}), 400
 
     try:
-        from detection.analyzer import QueryAnalyzer
-        from detection.ml_detector import MLDetector
-        from detection.combined_scorer import CombinedScorer
-
-        analyzer = QueryAnalyzer()
-        analysis = analyzer.analyze(query_text, user_id=g.user.get('user_id'))
-
-        ml = MLDetector()
-        ml_score = ml.score(query_text, analysis.get('parsed'))
-
+        analysis = _analyzer.analyze(query_text, user_id=g.user.get('user_id'))
+        ml_score = _ml_detector.score(query_text, analysis.get('parsed'))
         rule_score = analysis.get('risk_score', 0)
-        scorer = CombinedScorer()
-        combined_score = scorer.compute_combined_score(rule_score, ml_score)
-        classification = scorer.classify(
+        combined_score = _scorer.compute_combined_score(rule_score, ml_score)
+        classification = _scorer.classify(
             combined_score,
             block_threshold=current_app.config['RISK_THRESHOLD_BLOCK'],
             flag_threshold=current_app.config['RISK_THRESHOLD_FLAG']
@@ -176,20 +181,11 @@ def execute_sim_query():
         return jsonify({'error': 'Query too long'}), 400
 
     try:
-        from detection.analyzer import QueryAnalyzer
-        from detection.ml_detector import MLDetector
-        from detection.combined_scorer import CombinedScorer
-
-        analyzer = QueryAnalyzer()
-        analysis = analyzer.analyze(query_text, user_id=g.user.get('user_id'))
-
-        ml = MLDetector()
-        ml_score = ml.score(query_text, analysis.get('parsed'))
-
+        analysis = _analyzer.analyze(query_text, user_id=g.user.get('user_id'))
+        ml_score = _ml_detector.score(query_text, analysis.get('parsed'))
         rule_score = analysis.get('risk_score', 0)
-        scorer = CombinedScorer()
-        combined_score = scorer.compute_combined_score(rule_score, ml_score)
-        classification = scorer.classify(
+        combined_score = _scorer.compute_combined_score(rule_score, ml_score)
+        classification = _scorer.classify(
             combined_score,
             block_threshold=current_app.config['RISK_THRESHOLD_BLOCK'],
             flag_threshold=current_app.config['RISK_THRESHOLD_FLAG']

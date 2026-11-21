@@ -18,7 +18,11 @@ def login():
     if not username or not password:
         return jsonify({'success': False, 'error': 'Username and password required'}), 400
 
-    user = get_user_by_username(username)
+    try:
+        user = get_user_by_username(username)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 503
+
     if not user or not bcrypt.checkpw(password.encode(), user['password_hash'].encode()):
         return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
 

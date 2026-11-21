@@ -129,3 +129,16 @@ GROUP BY department;</textarea>
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const queryInput = document.getElementById('queryInput');
+        if (queryInput) {
+            queryInput.addEventListener('input', () => {
+                QuerySimulator.hideExecutionResults();
+            });
+        }
+    });
+</script>
+{% endblock %}

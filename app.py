@@ -14,7 +14,12 @@ app.config.from_object(Config)
 # ── Error Handlers ────────────────────────────────────────────────────
 
 def _is_api():
-    return request.path.startswith('/api/')
+    return (
+        request.path.startswith('/api/')
+        or request.path.startswith('/auth/')
+        or request.is_json
+        or request.headers.get('Accept', '').startswith('application/json')
+    )
 
 
 @app.errorhandler(401)
@@ -74,9 +79,9 @@ app.register_blueprint(api_bp)
 
 try:
     init_db(app)
-except Exception:
-    # DB may not be available during template development
-    pass
+except Exception as e:
+    print(f"\n[!] Database connection failed on startup: {e}")
+    print("[!] Ensure MySQL is running ('net start MySQL80') and run 'python database/setup.py --reset'.\n")
 
 
 if __name__ == '__main__':

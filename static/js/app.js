@@ -24,7 +24,9 @@ const API = {
             }
             const data = await response.json();
             if (!response.ok && !options.ignoreError) {
-                throw new Error(data.error || `HTTP error ${response.status}`);
+                const err = new Error(data.error || `HTTP error ${response.status}`);
+                Object.assign(err, data);
+                throw err;
             }
             return data;
         } catch (err) {
@@ -403,7 +405,19 @@ const QuerySimulator = {
         const input = document.getElementById('queryInput');
         if (input && this.presets[name]) {
             input.value = this.presets[name];
+            this.hideExecutionResults();
         }
+    },
+
+    hideExecutionResults() {
+        const resultsCard = document.getElementById('executionResultsCard');
+        if (resultsCard) resultsCard.style.display = 'none';
+        const thead = document.getElementById('resultsTableHead');
+        const tbody = document.getElementById('resultsTableBody');
+        const rowCount = document.getElementById('resultsRowCount');
+        if (thead) thead.innerHTML = '';
+        if (tbody) tbody.innerHTML = '';
+        if (rowCount) rowCount.textContent = '0 rows';
     },
 
     async analyze() {
@@ -413,14 +427,18 @@ const QuerySimulator = {
             return;
         }
 
+        this.hideExecutionResults();
+
         const btn = document.getElementById('btnAnalyze');
         if (btn) btn.disabled = true;
 
         try {
             const result = await API.post('/api/query/analyze', { query: queryText });
             this.displayAnalysis(result);
+            this.hideExecutionResults();
             showToast('Analysis completed successfully.', 'success');
         } catch (err) {
+            this.hideExecutionResults();
             showToast(err.message || 'Failed to analyze query', 'danger');
         } finally {
             if (btn) btn.disabled = false;
@@ -434,15 +452,22 @@ const QuerySimulator = {
             return;
         }
 
+        this.hideExecutionResults();
+
         const btn = document.getElementById('btnExecute');
         if (btn) btn.disabled = true;
 
         try {
             const result = await API.post('/api/query/execute', { query: queryText });
             this.displayAnalysis(result);
-            this.displayExecutionResults(result.results || []);
-            showToast('Query executed safely against employee database.', 'success');
+            if (result.is_blocked || (result.classification && result.classification.toUpperCase() === 'BLOCKED')) {
+                this.hideExecutionResults();
+            } else {
+                this.displayExecutionResults(result.results || []);
+                showToast('Query executed safely against employee database.', 'success');
+            }
         } catch (err) {
+            this.hideExecutionResults();
             // Check if blocked by security
             if (err.message && err.message.toLowerCase().includes('blocked')) {
                 showToast('SECURITY BLOCK: Query terminated by DB Sentinel!', 'danger');
@@ -465,6 +490,9 @@ const QuerySimulator = {
 
         const riskScore = Math.round((data.risk_score || 0) * 100);
         const classification = (data.classification || 'SAFE').toUpperCase();
+        if (classification === 'BLOCKED' || data.is_blocked) {
+            this.hideExecutionResults();
+        }
 
         // Update Gauge & Badge
         const scoreVal = document.getElementById('riskScoreValue');
